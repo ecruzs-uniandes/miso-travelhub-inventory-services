@@ -38,7 +38,15 @@ def _serialize(rate: Rate) -> dict:
     }
 
 
+_listeners_registered = False
+
+
 def register_rate_audit_listeners() -> None:
+    global _listeners_registered
+    if _listeners_registered:
+        return
+    _listeners_registered = True
+
     @event.listens_for(Session, "after_flush")
     def _after_flush(session: Session, flush_context):
         for obj in session.new:

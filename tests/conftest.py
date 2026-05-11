@@ -1,4 +1,5 @@
 import asyncio
+import os
 from collections.abc import AsyncGenerator
 from uuid import uuid4
 
@@ -7,14 +8,16 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.audit.listeners import register_rate_audit_listeners
 from app.database import get_db
 from app.main import app
 from app.models import Base, Hotel, Room
 
-# Use Postgres for full-feature tests; CI sets DATABASE_URL_TEST.
-# For quick local runs (no overlap-constraint check), aiosqlite works for most tests.
-TEST_DB_URL = "postgresql+asyncpg://travelhub_app:travelhub_local@localhost:5432/travelhub_test"
+# Read from DATABASE_URL env var so CI password matches the postgres service.
+# Fallback to local dev defaults when running outside CI.
+TEST_DB_URL = os.environ.get(
+    "DATABASE_URL",
+    "postgresql+asyncpg://travelhub_app:travelhub_local@localhost:5432/travelhub_test",
+)
 
 
 @pytest.fixture(scope="session")
@@ -27,7 +30,6 @@ def event_loop():
 @pytest_asyncio.fixture(scope="session")
 async def engine():
     eng = create_async_engine(TEST_DB_URL, pool_pre_ping=True)
-    register_rate_audit_listeners()
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)

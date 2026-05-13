@@ -110,7 +110,7 @@ jobs:
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
       - name: Build + push
         run: |
-          docker build -t ${{ env.DEV_IMAGE }}:${{ github.sha }} -t ${{ env.DEV_IMAGE }}:latest .
+          docker build -f deploy/Dockerfile -t ${{ env.DEV_IMAGE }}:${{ github.sha }} -t ${{ env.DEV_IMAGE }}:latest .
           docker push --all-tags ${{ env.DEV_IMAGE }}
       - name: Deploy Cloud Run
         run: |
@@ -148,7 +148,7 @@ jobs:
         run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
       - name: Build + push
         run: |
-          docker build -t ${{ env.PROD_IMAGE }}:${{ github.sha }} -t ${{ env.PROD_IMAGE }}:latest .
+          docker build -f deploy/Dockerfile -t ${{ env.PROD_IMAGE }}:${{ github.sha }} -t ${{ env.PROD_IMAGE }}:latest .
           docker push --all-tags ${{ env.PROD_IMAGE }}
       - name: Create Cloud Deploy release
         run: |
@@ -166,4 +166,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        run: docker build -t ${{ env.SERVICE_NAME }}:${{ github.sha }} .
+        run: docker build -f deploy/Dockerfile -t ${{ env.SERVICE_NAME }}:${{ github.sha }} .

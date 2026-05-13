@@ -1,15 +1,87 @@
-# CLAUDE_CODE — `inventory-services` — Módulo `rates`
+# CLAUDE.md — `inventory-services`
 
-> Archivo de instrucciones para **Claude Code (CLI local)**. Su objetivo es generar el repositorio `inventory-services` desde cero con el módulo de **Tarifas (rates)** como primer módulo funcional, listo para correr local con Docker Compose y desplegar a Cloud Run.
->
-> **Proyecto:** TravelHub — Grupo 9 — MISW4501 / PF2 — Universidad de los Andes
-> **Owner:** Edwin Cruz Silva
-> **Microservicio:** `inventory-services`
-> **Módulo:** `rates` (CRUD de Tarifa por habitación)
+Microservicio de inventario TravelHub. Módulo inicial: **Tarifas (rates)** — CRUD con validación de no-solapamiento, auditoría append-only y RBAC/MFA.
+
+## Stack
+
+Python 3.11 · FastAPI 0.115 · SQLAlchemy 2.0 async + asyncpg · Pydantic v2 · PostgreSQL 16
+
+## Comandos
+
+```bash
+# Local
+cd deploy && docker compose up --build -d
+# Tests
+pytest
+# Lint
+ruff check app/ tests/ || true
+# Build local
+docker build -t inventory-services:dev .
+# Deploy manual
+bash deploy/deploy-cloudrun.sh dev    # o prod
+```
+
+## Despliegue actual
+
+| Ambiente | Project | Estado |
+|---|---|---|
+| **DEV** | `gen-lang-client-0930444414` | ⚠ Pendiente primer deploy (gateway = PLACEHOLDER) |
+| **PROD** | `travelhub-prod-492116` | ⚠ Pendiente primer deploy |
+
+### Prerrequisitos antes del primer deploy
+
+1. Crear Artifact Registry repos `inventory-services` en DEV y PROD.
+2. Crear SA `github-deploy-inventory@<project>.iam.gserviceaccount.com` en cada proyecto con roles: `roles/run.admin`, `roles/storage.admin`, `roles/artifactregistry.writer`, `roles/clouddeploy.releaser`.
+3. Vincular los SAs al WIF pool `github-pool/providers/github-provider` para el repo GitHub.
+4. Crear secret `INVENTORY_DATABASE_URL` en Secret Manager DEV y PROD con la URL completa incluyendo `?ssl=disable`:
+   - Formato: `postgresql+asyncpg://user:pass@10.x.x.x:5432/travelhub?ssl=disable`
+   - DEV IP Cloud SQL: misma que `PMS_DATABASE_HOST` + puerto 5432
+   - PROD IP Cloud SQL: `10.200.0.3:5432`
+5. Dar `roles/secretmanager.secretAccessor` al SA de Cloud Run (Compute Engine default SA) sobre `INVENTORY_DATABASE_URL`.
+6. Registrar el pipeline Cloud Deploy: `gcloud deploy apply --file=clouddeploy.yaml --project=travelhub-prod-492116 --region=us-central1`
+7. Tras el primer deploy exitoso, reemplazar `inventory-services-PLACEHOLDER.a.run.app` en `uniandes-pf-infra-gcp/gateway/openapi-spec-prod.yaml` y re-deployar gateway.
+
+## Network setup (gotchas críticos)
+
+1. **Direct VPC egress** (no VPC connector): `--network=travelhub-vpc --subnet=subnet-services --vpc-egress=private-ranges-only`
+2. **`?ssl=disable`** en `DATABASE_URL` (asyncpg + Cloud SQL private IP ya está en red privada)
+3. **`X-Forwarded-Authorization`**: el API Gateway reemplaza `Authorization` con OIDC propio y mueve el JWT del usuario a `X-Forwarded-Authorization`. El `extract_token` en `app/auth/jwt_decoder.py` ya lo maneja correctamente.
+
+## Endpoints HTTP
+
+Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya verificó).
+
+| Método | Path | Roles | Descripción |
+|---|---|---|---|
+| GET | `/health` | público | Estado del servicio |
+| POST | `/api/v1/inventory/rooms/{room_id}/rates` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido) |
+| GET | `/api/v1/inventory/rooms/{room_id}/rates` | `hotel_admin`, `platform_admin` | Listar tarifas de habitación |
+| GET | `/api/v1/inventory/hotels/{hotel_id}/rates` | `hotel_admin`, `platform_admin` | Listar tarifas de hotel |
+| GET | `/api/v1/inventory/rates/{rate_id}` | `hotel_admin`, `platform_admin` | Detalle tarifa |
+| PATCH | `/api/v1/inventory/rates/{rate_id}` | `hotel_admin`, `platform_admin` | Actualizar (MFA requerido) |
+| DELETE | `/api/v1/inventory/rates/{rate_id}` | `hotel_admin`, `platform_admin` | Soft delete → inactive (MFA requerido) |
+| GET | `/api/v1/inventory/rates/effective?room_id&date` | `hotel_admin`, `platform_admin` | Tarifa vigente con precio final |
+
+## CI/CD
+
+Pipeline en `.github/workflows/ci.yml`. Auth via WIF (sin SA keys).
+
+| Trigger | Acción |
+|---|---|
+| Push `feature/*`, `develop` | Tests + Lint + Deploy a Cloud Run DEV |
+| PR a `main`/`develop` | Tests + Lint + Docker Build (sin deploy) |
+| Push `main` | Tests + Lint + Build + **Cloud Deploy canary** (10→50→100, manual approval) |
+
+## NO HACER
+
+- Verificar firma JWT — usar solo `jwt.get_unverified_claims(token)` (el gateway ya verificó)
+- VPC connector — usar Direct VPC egress
+- Hardcodear credenciales DB — usar Secret Manager (`INVENTORY_DATABASE_URL`)
+- Omitir `version_table='alembic_version_inventory'` en alembic/env.py (DB compartida con otros servicios)
 
 ---
 
-## 0. Asunciones de partida
+## 0. Asunciones de partida (scaffolding original)
 
 1. **Repo nuevo desde cero.** Si ya hay scaffolding previo, descartar y reconstruir según este documento.
 2. **Hotel y Room son entidades mínimas de soporte** sólo para tener FKs reales. Sus endpoints no son parte de este módulo y se agregarán después.

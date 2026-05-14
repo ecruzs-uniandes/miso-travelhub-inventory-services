@@ -19,35 +19,35 @@ def _svc(db: AsyncSession) -> RateService:
 
 
 @router.post(
-    "/rooms/{room_id}/rates",
+    "/habitaciones/{habitacion_id}/rates",
     status_code=status.HTTP_201_CREATED,
-    responses={400: {"description": "room_id in path and body must match"}},
+    responses={400: {"description": "habitacion_id in path and body must match"}},
 )
 async def create_rate(
-    room_id: UUID,
+    habitacion_id: str,
     body: RateCreate,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(auth_chain)],
 ) -> RateRead:
-    if body.room_id != room_id:
-        raise HTTPException(status_code=400, detail="room_id in path and body must match")
+    if body.habitacionId != habitacion_id:
+        raise HTTPException(status_code=400, detail="habitacion_id in path and body must match")
     rate = await _svc(db).create(body)
     return RateRead.model_validate(rate)
 
 
-@router.get("/rooms/{room_id}/rates")
-async def list_rates_for_room(
-    room_id: UUID,
+@router.get("/habitaciones/{habitacion_id}/rates")
+async def list_rates_for_habitacion(
+    habitacion_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(auth_chain)],
 ) -> list[RateRead]:
-    rates = await _svc(db).list_by_room(room_id)
+    rates = await _svc(db).list_by_habitacion(habitacion_id)
     return [RateRead.model_validate(r) for r in rates]
 
 
 @router.get("/hotels/{hotel_id}/rates")
 async def list_rates_for_hotel(
-    hotel_id: UUID,
+    hotel_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(auth_chain)],
 ) -> list[RateRead]:
@@ -61,13 +61,13 @@ async def list_rates_for_hotel(
 async def get_effective_rate(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[dict, Depends(auth_chain)],
-    room_id: Annotated[UUID, Query(...)],
+    habitacion_id: Annotated[str, Query(...)],
     on_date: Annotated[date, Query(..., alias="date")],
 ) -> RateEffective:
-    rate, final = await _svc(db).get_effective(room_id, on_date)
+    rate, final = await _svc(db).get_effective(habitacion_id, on_date)
     return RateEffective(
         rate_id=rate.id,
-        room_id=rate.room_id,
+        habitacionId=rate.habitacionId,
         base_price=rate.base_price,
         currency=rate.currency,
         discount=rate.discount,

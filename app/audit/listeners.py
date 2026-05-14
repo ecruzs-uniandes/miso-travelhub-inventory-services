@@ -28,7 +28,7 @@ def _serialize(rate: Rate) -> dict:
 
     return {
         "id": conv(rate.id),
-        "room_id": conv(rate.room_id),
+        "habitacionId": rate.habitacionId,
         "base_price": conv(rate.base_price),
         "currency": rate.currency,
         "valid_from": conv(rate.valid_from),

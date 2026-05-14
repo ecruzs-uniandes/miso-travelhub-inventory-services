@@ -7,11 +7,11 @@ from tests.helpers import auth_headers
 
 
 @pytest.mark.asyncio
-async def test_create_writes_history_row(client, engine, sample_room, sample_hotel):
+async def test_create_writes_history_row(client, engine, sample_habitacion, sample_hotel):
     r = await client.post(
-        f"/api/v1/inventory/rooms/{sample_room.id}/rates",
+        f"/api/v1/inventory/habitaciones/{sample_habitacion.id}/rates",
         json={
-            "room_id": str(sample_room.id),
+            "habitacionId": str(sample_habitacion.id),
             "base_price": "100000.00",
             "valid_from": "2027-01-01",
             "valid_to": "2027-01-31",

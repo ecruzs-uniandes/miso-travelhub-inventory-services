@@ -8,7 +8,7 @@ from app.models.rate import RateStatus
 
 
 class RateCreate(BaseModel):
-    room_id: UUID
+    habitacionId: str
     base_price: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     valid_from: date
     valid_to: date
@@ -33,7 +33,7 @@ class RateRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    room_id: UUID
+    habitacionId: str
     base_price: Decimal
     currency: str
     valid_from: date
@@ -48,7 +48,7 @@ class RateEffective(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     rate_id: UUID
-    room_id: UUID
+    habitacionId: str
     base_price: Decimal
     currency: str
     discount: Decimal

@@ -6,21 +6,21 @@ from tests.helpers import auth_headers
 
 
 @pytest.mark.asyncio
-async def test_traveler_forbidden(client, sample_room, sample_hotel):
+async def test_traveler_forbidden(client, sample_habitacion, sample_hotel):
     r = await client.get(
-        f"/api/v1/inventory/rooms/{sample_room.id}/rates",
+        f"/api/v1/inventory/habitaciones/{sample_habitacion.id}/rates",
         headers=auth_headers(role="traveler"),
     )
     assert r.status_code == 403
 
 
 @pytest.mark.asyncio
-async def test_hotel_admin_other_hotel_forbidden(client, sample_room):
+async def test_hotel_admin_other_hotel_forbidden(client, sample_habitacion):
     other_hotel = uuid4()
     r = await client.post(
-        f"/api/v1/inventory/rooms/{sample_room.id}/rates",
+        f"/api/v1/inventory/habitaciones/{sample_habitacion.id}/rates",
         json={
-            "room_id": str(sample_room.id),
+            "habitacionId": str(sample_habitacion.id),
             "base_price": "100000.00",
             "valid_from": "2026-11-01",
             "valid_to": "2026-11-30",
@@ -32,7 +32,7 @@ async def test_hotel_admin_other_hotel_forbidden(client, sample_room):
 
 
 @pytest.mark.asyncio
-async def test_platform_admin_can_access_any_hotel(client, sample_room, sample_hotel):
+async def test_platform_admin_can_access_any_hotel(client, sample_habitacion, sample_hotel):
     r = await client.get(
         f"/api/v1/inventory/hotels/{sample_hotel.id}/rates",
         headers=auth_headers(role="platform_admin"),
@@ -41,17 +41,17 @@ async def test_platform_admin_can_access_any_hotel(client, sample_room, sample_h
 
 
 @pytest.mark.asyncio
-async def test_missing_jwt_returns_401(client, sample_room):
-    r = await client.get(f"/api/v1/inventory/rooms/{sample_room.id}/rates")
+async def test_missing_jwt_returns_401(client, sample_habitacion):
+    r = await client.get(f"/api/v1/inventory/habitaciones/{sample_habitacion.id}/rates")
     assert r.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_mfa_required_for_write(client, sample_room, sample_hotel):
+async def test_mfa_required_for_write(client, sample_habitacion, sample_hotel):
     r = await client.post(
-        f"/api/v1/inventory/rooms/{sample_room.id}/rates",
+        f"/api/v1/inventory/habitaciones/{sample_habitacion.id}/rates",
         json={
-            "room_id": str(sample_room.id),
+            "habitacionId": str(sample_habitacion.id),
             "base_price": "100000.00",
             "valid_from": "2026-12-01",
             "valid_to": "2026-12-31",

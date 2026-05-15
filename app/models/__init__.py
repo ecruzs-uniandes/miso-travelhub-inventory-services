@@ -1,15 +1,14 @@
 from app.models.base import Base
 from app.models.habitacion import Habitacion
 from app.models.hotel import Hotel
-from app.models.rate import Rate, RateStatus
-from app.models.rate_history import AuditAction, RateHistory
+from app.models.tarifa import Tarifa
+from app.models.tarifa_history import AuditAction, TarifaHistory
 
 __all__ = [
     "Base",
     "Hotel",
     "Habitacion",
-    "Rate",
-    "RateStatus",
-    "RateHistory",
+    "Tarifa",
+    "TarifaHistory",
     "AuditAction",
 ]

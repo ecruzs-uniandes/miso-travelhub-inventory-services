@@ -1,24 +1,21 @@
-"""SQLAlchemy event listeners that mirror Rate changes into rate_history.
+"""SQLAlchemy event listeners that mirror Tarifa changes into tarifa_history.
 
 Uses contextvars (current_user_id, current_ip) populated by the auth chain.
 """
 from datetime import date, datetime
-from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import event
 from sqlalchemy.orm import Session
 
 from app.context import current_ip, current_user_id
-from app.models.rate import Rate
-from app.models.rate_history import AuditAction, RateHistory
+from app.models.tarifa import Tarifa
+from app.models.tarifa_history import AuditAction, TarifaHistory
 
 
-def _serialize(rate: Rate) -> dict:
+def _serialize(tarifa: Tarifa) -> dict:
     def conv(v):
-        if isinstance(v, Decimal):
-            return str(v)
-        if isinstance(v, (date, datetime)):
+        if isinstance(v, date | datetime):
             return v.isoformat()
         if isinstance(v, UUID):
             return str(v)
@@ -27,21 +24,20 @@ def _serialize(rate: Rate) -> dict:
         return v
 
     return {
-        "id": conv(rate.id),
-        "habitacionId": rate.habitacionId,
-        "base_price": conv(rate.base_price),
-        "currency": rate.currency,
-        "valid_from": conv(rate.valid_from),
-        "valid_to": conv(rate.valid_to),
-        "discount": conv(rate.discount),
-        "status": conv(rate.status),
+        "id": tarifa.id,
+        "habitacionId": tarifa.habitacionId,
+        "precioBase": tarifa.precioBase,
+        "moneda": tarifa.moneda,
+        "fechaInicio": conv(tarifa.fechaInicio),
+        "fechaFin": conv(tarifa.fechaFin),
+        "descuento": tarifa.descuento,
     }
 
 
 _listeners_registered = False
 
 
-def register_rate_audit_listeners() -> None:
+def register_tarifa_audit_listeners() -> None:
     global _listeners_registered
     if _listeners_registered:
         return
@@ -50,10 +46,10 @@ def register_rate_audit_listeners() -> None:
     @event.listens_for(Session, "after_flush")
     def _after_flush(session: Session, flush_context):
         for obj in session.new:
-            if isinstance(obj, Rate):
+            if isinstance(obj, Tarifa):
                 session.add(
-                    RateHistory(
-                        rate_id=obj.id,
+                    TarifaHistory(
+                        tarifa_id=obj.id,
                         action=AuditAction.CREATE,
                         changed_by_user_id=current_user_id.get(),
                         changed_by_ip=current_ip.get(),
@@ -62,8 +58,7 @@ def register_rate_audit_listeners() -> None:
                     )
                 )
         for obj in session.dirty:
-            if isinstance(obj, Rate) and session.is_modified(obj):
-                # Get old values from history attribute
+            if isinstance(obj, Tarifa) and session.is_modified(obj):
                 hist_old = {}
                 from sqlalchemy import inspect
 
@@ -73,8 +68,8 @@ def register_rate_audit_listeners() -> None:
                     if h.has_changes():
                         hist_old[attr.key] = h.deleted[0] if h.deleted else None
                 session.add(
-                    RateHistory(
-                        rate_id=obj.id,
+                    TarifaHistory(
+                        tarifa_id=obj.id,
                         action=AuditAction.UPDATE,
                         changed_by_user_id=current_user_id.get(),
                         changed_by_ip=current_ip.get(),
@@ -83,10 +78,10 @@ def register_rate_audit_listeners() -> None:
                     )
                 )
         for obj in session.deleted:
-            if isinstance(obj, Rate):
+            if isinstance(obj, Tarifa):
                 session.add(
-                    RateHistory(
-                        rate_id=obj.id,
+                    TarifaHistory(
+                        tarifa_id=obj.id,
                         action=AuditAction.DELETE,
                         changed_by_user_id=current_user_id.get(),
                         changed_by_ip=current_ip.get(),

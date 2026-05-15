@@ -1,9 +1,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
-from decimal import Decimal
-from uuid import UUID
+from datetime import UTC, datetime
 
 from app.config import settings
 
@@ -40,43 +38,41 @@ def _delivery_callback(err, msg):
         logger.info(f"Event delivered to {msg.topic()} [{msg.partition()}] @ offset {msg.offset()}")
 
 
-def publish_rate_event(
+def publish_tarifa_event(
     event_type: str,
-    hotel_id: UUID,
-    room_id: UUID,
-    rate_id: UUID,
-    base_price: Decimal,
-    currency: str,
-    discount: Decimal,
-    final_price: Decimal,
-    valid_from: str,
-    valid_to: str,
-    status: str,
+    hotel_id: str,
+    habitacion_id: str,
+    tarifa_id: str,
+    precio_base: float,
+    moneda: str,
+    descuento: float,
+    precio_final: float,
+    fecha_inicio: str,
+    fecha_fin: str,
 ) -> bool:
     payload = {
         "event_id": str(uuid.uuid4()),
         "event_type": event_type,
         "hotel_id": str(hotel_id),
-        "room_id": str(room_id),
-        "rate_id": str(rate_id),
-        "base_price": str(base_price),
-        "currency": currency,
-        "discount": str(discount),
-        "final_price": str(final_price),
-        "valid_from": valid_from,
-        "valid_to": valid_to,
-        "status": status,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "habitacion_id": str(habitacion_id),
+        "tarifa_id": str(tarifa_id),
+        "precio_base": precio_base,
+        "moneda": moneda,
+        "descuento": descuento,
+        "precio_final": precio_final,
+        "fecha_inicio": fecha_inicio,
+        "fecha_fin": fecha_fin,
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     message = json.dumps(payload)
 
     if not settings.kafka_enabled:
-        logger.info(f"Kafka disabled — rate event logged: {message[:200]}")
+        logger.info(f"Kafka disabled — tarifa event logged: {message[:200]}")
         return True
 
     producer = get_producer()
     if producer is None:
-        logger.warning("Kafka producer unavailable — rate event not published")
+        logger.warning("Kafka producer unavailable — tarifa event not published")
         return False
 
     try:
@@ -89,7 +85,7 @@ def publish_rate_event(
         producer.poll(0)
         return True
     except Exception as e:
-        logger.error(f"Failed to publish rate event: {e}")
+        logger.error(f"Failed to publish tarifa event: {e}")
         return False
 
 

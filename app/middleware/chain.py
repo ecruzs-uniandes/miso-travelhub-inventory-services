@@ -1,5 +1,5 @@
 """Wires the Chain of Responsibility and exposes it as a FastAPI dependency."""
-from fastapi import Depends, Request
+from fastapi import Request
 
 from app.auth.jwt_decoder import decode_jwt, extract_token
 from app.middleware.filters.ip_validation import IPValidationFilter

@@ -33,4 +33,4 @@ class Habitacion(Base):
     amenidades: Mapped[Any] = mapped_column(JSON, nullable=False)
 
     hotel: Mapped["Hotel"] = relationship(back_populates="habitaciones")  # noqa: F821
-    tarifas: Mapped[list["Rate"]] = relationship(back_populates="habitacion")  # noqa: F821
+    tarifas: Mapped[list["Tarifa"]] = relationship(back_populates="habitacion")  # noqa: F821

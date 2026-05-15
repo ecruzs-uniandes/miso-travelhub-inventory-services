@@ -59,6 +59,7 @@ bash deploy/deploy-cloudrun.sh dev    # o prod
 5. Dar `roles/secretmanager.secretAccessor` al SA de Cloud Run (Compute Engine default SA) sobre `INVENTORY_DATABASE_URL`.
 6. Registrar el pipeline Cloud Deploy: `gcloud deploy apply --file=clouddeploy.yaml --project=travelhub-prod-492116 --region=us-central1`
 7. Tras el primer deploy exitoso, reemplazar `inventory-services-PLACEHOLDER.a.run.app` en `uniandes-pf-infra-gcp/gateway/openapi-spec-prod.yaml` y re-deployar gateway.
+8. **IAM público a nivel Cloud Run** (igual que el resto de microservicios): `gcloud run services add-iam-policy-binding inventory-services --region=us-central1 --project=<PROJECT> --member=allUsers --role=roles/run.invoker`. Sin esto el verify-health de Cloud Deploy falla con 403. La validación JWT vive en gateway (firma) + backend (decode no-verify). CI/CD ya hace el binding idempotente en cada deploy-prod (ver `.github/workflows/ci.yml`).
 
 ## Network setup (gotchas críticos)
 

@@ -150,6 +150,14 @@ jobs:
         run: |
           docker build -f deploy/Dockerfile -t ${{ env.PROD_IMAGE }}:${{ github.sha }} -t ${{ env.PROD_IMAGE }}:latest .
           docker push --all-tags ${{ env.PROD_IMAGE }}
+      - name: Ensure allUsers can invoke (idempotent — required by Cloud Deploy verify-health)
+        run: |
+          gcloud run services add-iam-policy-binding ${{ env.SERVICE_NAME }} \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROD_PROJECT_ID }} \
+            --member=allUsers \
+            --role=roles/run.invoker \
+            --condition=None || true
       - name: Create Cloud Deploy release
         run: |
           gcloud deploy releases create prod-${GITHUB_SHA::8}-$(date +%Y%m%d%H%M%S) \

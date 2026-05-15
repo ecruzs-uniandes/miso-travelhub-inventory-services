@@ -1,3 +1,13 @@
+# NOTA: este manifiesto NO controla el IAM binding (allUsers -> run.invoker).
+# El binding se aplica como step previo en .github/workflows/ci.yml deploy-prod,
+# o manualmente:
+#   gcloud run services add-iam-policy-binding inventory-services \
+#     --region=us-central1 --project=travelhub-prod-492116 \
+#     --member=allUsers --role=roles/run.invoker
+# Sin este binding el verify-health de Cloud Deploy falla con 403 (skaffold
+# pega /health sin token). La validacion JWT vive en gateway + backend; el
+# servicio publico a nivel Cloud Run es la convencion TravelHub (igual a
+# user-services, pms-int, pms-sync, notification).
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:

@@ -21,13 +21,14 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 
 | Método | Ruta | Descripción |
 |---|---|---|
-| POST   | `/habitaciones/{habitacion_id}/tarifas` | Crear tarifa. Moneda heredada de `hotel.currency`. |
-| GET    | `/habitaciones/{habitacion_id}/tarifas` | Listar tarifas de una habitación |
+| POST   | `/habitaciones/{habitacion_id}/tarifas` | Crear tarifa. Moneda heredada de `hotel.currency`. Acepta solapamientos (base + promos). |
+| GET    | `/habitaciones/{habitacion_id}/tarifas` | Listar todas (base + promos) de una habitación |
+| GET    | `/habitaciones/{habitacion_id}/tarifas/base?fecha=<ISO>` | **Base vigente** (descuento=0). Ignora promos. Para el front del admin |
 | GET    | `/hoteles/{hotel_id}/tarifas` | Listar todas las tarifas de un hotel |
-| GET    | `/tarifas/vigente?habitacion_id=<id>&fecha=<ISO>` | Tarifa vigente con `precioFinal` calculado |
+| GET    | `/tarifas/vigente?habitacion_id=<id>&fecha=<ISO>` | Tarifa **vigente** (incluye promos) con `precioFinal` calculado |
 | GET    | `/tarifas/{tarifa_id}` | Detalle |
 | PATCH  | `/tarifas/{tarifa_id}` | Actualizar campos parciales |
-| DELETE | `/tarifas/{tarifa_id}` | **Hard delete** (no soft) — audit row queda en `tarifa_history` |
+| DELETE | `/tarifas/{tarifa_id}` | **Hard delete** — audit row queda en `tarifa_history` |
 
 ### Schema body (POST/PATCH)
 
@@ -45,12 +46,17 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 - `fechaInicio`, `fechaFin`: `timestamptz` (ISO 8601 con zona)
 - `moneda` se ignora en el body — siempre hereda de `hotel.currency`
 
-### Reglas de dominio
+### Reglas de dominio (modelo de promos, desde 2026-05-14)
 
-1. No-overlap entre tarifas para misma `habitacionId` (constraint `EXCLUDE USING gist` + validación servicio).
-2. `descuento ∈ [0, 1]`, `precioBase > 0`, `fechaInicio ≤ fechaFin` (CheckConstraints).
-3. `tarifa.moneda` se hereda de `hotel.currency` (`Hotel` ↔ `Habitacion` ↔ `Tarifa`).
-4. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners.
+1. **Overlap permitido**: múltiples tarifas pueden cubrir el mismo rango para una habitación. Convención: `descuento=0` es base, `descuento>0` es promo. No hay constraint EXCLUDE.
+2. **Resolución `/vigente`**: "rango más estrecho gana, fechaInicio más reciente como desempate".
+   - Base anual + promo 3 días → promo gana en su rango
+   - Base anual + base trimestral (cambio prospectivo) → trimestral gana
+   - Para subir base: crear nueva fila con rango más corto
+3. **`/base`** ignora promos — el front del admin lo usa para mostrar la base actual y editarla.
+4. `descuento ∈ [0, 1]`, `precioBase > 0`, `fechaInicio ≤ fechaFin` (CheckConstraints).
+5. `tarifa.moneda` se hereda de `hotel.currency` (`Hotel` ↔ `Habitacion` ↔ `Tarifa`).
+6. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners.
 
 ## Tests
 

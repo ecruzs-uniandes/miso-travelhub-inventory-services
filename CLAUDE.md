@@ -14,11 +14,16 @@ Python 3.11 · FastAPI 0.115 · SQLAlchemy 2.0 async + asyncpg · Pydantic v2 ·
 | `tarifa_history` | `tarifa_id` varchar (lógico FK), `action` enum, JSONB old/new | Audit append-only — sin FK formal para que DELETE no borre histórico |
 | `habitacion`, `hotel` | (read-only desde inventory) | Owner: search-service. Cols mapeadas mínimas en `app/models/habitacion.py` + `app/models/hotel.py` |
 
-**Reglas de dominio cerradas**:
-1. Sin solapamiento de rangos para misma `habitacionId` (EXCLUDE constraint gist + tstzrange + validación servicio).
-2. `descuento` en [0, 1] (no porcentual 0-100). `precio_final = precioBase * (1 - descuento)`.
-3. Una habitacion = una moneda → `tarifa.moneda` se hereda de `hotel.currency` en `create()`, no se acepta en `update()`.
-4. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners (`after_flush`) + contextvars para inyectar user_id/ip.
+**Reglas de dominio cerradas** (modelo de promos desde 2026-05-14):
+1. **Overlap permitido**: múltiples tarifas pueden solapar para misma `habitacionId`. Convención: `descuento=0` es base, `descuento>0` es promo. EXCLUDE constraint **eliminado** (alembic 0004).
+2. **Resolución `/vigente`**: regla "rango más estrecho gana, fechaInicio más reciente como desempate":
+   - Base anual + Promo 3 días → promo gana en sus 3 días
+   - Base anual + nueva base trimestral (cambio prospectivo) → trimestral gana en su rango
+   - "Subir base" prospectivo: crear nueva fila base con rango más corto desde la fecha deseada
+3. **`/base`** (admin): devuelve la base (descuento=0) vigente, ignora promos. Usado por el front para mostrar/editar la base actual.
+4. `descuento` en [0, 1] (no porcentual). `precio_final = precioBase * (1 - descuento)`.
+5. Una habitacion = una moneda → `tarifa.moneda` se hereda de `hotel.currency` en `create()`, no se acepta en `update()`.
+6. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners + contextvars.
 
 ## Comandos
 
@@ -68,13 +73,14 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 | Método | Path | Roles | Descripción |
 |---|---|---|---|
 | GET | `/health` | público | Estado del servicio + DB + Kafka |
-| POST | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido). Body: `{habitacionId, precioBase, moneda?, fechaInicio, fechaFin, descuento}`. Moneda se ignora — siempre hereda de `hotel.currency`. |
-| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar tarifas de habitación |
-| GET | `/api/v1/inventory/hoteles/{hotel_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar tarifas de hotel |
+| POST | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido). Body: `{habitacionId, precioBase, moneda?, fechaInicio, fechaFin, descuento}`. Moneda se ignora — siempre hereda de `hotel.currency`. Acepta múltiples filas solapadas (base + promos). |
+| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas de la habitación (base + promos). Front filtra por `descuento==0` / `>0` si quiere. |
+| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas/base?fecha=ISO` | `hotel_admin`, `platform_admin` | Tarifa **base** (descuento=0) vigente. Ignora promos. Para el front del admin. Si hay multi-base, devuelve la más estrecha. 404 si no hay base vigente. |
+| GET | `/api/v1/inventory/hoteles/{hotel_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas del hotel (todas las habitaciones) |
 | GET | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Detalle tarifa |
 | PATCH | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Actualizar (MFA requerido) |
 | DELETE | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | **Hard delete** (MFA requerido). Audit row queda en `tarifa_history`. |
-| GET | `/api/v1/inventory/tarifas/vigente?habitacion_id&fecha` | `hotel_admin`, `platform_admin` | Tarifa vigente para `fecha` (datetime ISO) con `precioFinal` calculado |
+| GET | `/api/v1/inventory/tarifas/vigente?habitacion_id&fecha` | `hotel_admin`, `platform_admin` | Tarifa **vigente** (considerando promos) para `fecha` (datetime ISO) con `precioFinal` calculado. Regla: rango más estrecho gana. |
 
 **Cambios respecto a la API legacy `/rates`** (2026-05-14):
 

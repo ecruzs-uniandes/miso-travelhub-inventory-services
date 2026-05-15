@@ -4,9 +4,9 @@ from contextlib import asynccontextmanager
 import structlog
 from fastapi import FastAPI
 
-from app.audit.listeners import register_rate_audit_listeners
+from app.audit.listeners import register_tarifa_audit_listeners
 from app.config import settings
-from app.routers import health, rates
+from app.routers import health, tarifas
 from app.services import kafka_producer as kp
 
 logging.basicConfig(level=settings.log_level)
@@ -16,7 +16,7 @@ structlog.configure()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     kp.get_producer()  # initialize on startup if kafka_enabled
-    register_rate_audit_listeners()
+    register_tarifa_audit_listeners()
     yield
     kp.close_producer()
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="inventory-services", version="0.1.0", lifespan=lifespan)
 
 app.include_router(health.router)
-app.include_router(rates.router)
+app.include_router(tarifas.router)
 
 
 @app.get("/")

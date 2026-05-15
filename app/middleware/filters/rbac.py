@@ -1,14 +1,12 @@
 """RBAC: validates the role against the requested route.
 
-For inventory-services rates module:
+For inventory-services tarifa module:
 - traveler:        FORBIDDEN
-- hotel_admin:     allowed only for routes operating on rooms of own hotel
+- hotel_admin:     allowed only for tarifas de habitaciones de su hotel
                    (the per-resource hotel_id check happens in the service layer)
 - platform_admin:  allowed for everything
 
-The 'own hotel' check requires loading the room/rate to know its hotel_id, so
-RBAC here is coarse-grained (role check). Fine-grained ownership is enforced
-in the service layer (see RateService).
+Fine-grained ownership is enforced in the service layer (see TarifaService).
 """
 from typing import Any
 
@@ -26,7 +24,7 @@ class RBACFilter(AuthFilter):
         if role not in ALLOWED_ROLES:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{role}' cannot access inventory rates",
+                detail=f"Role '{role}' cannot access inventory tarifas",
             )
 
         # Populate context for downstream service-layer checks and audit

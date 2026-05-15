@@ -27,4 +27,9 @@ async def health(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
         kafka_status = "ok" if kp.get_producer() is not None else "error"
 
     overall = "ok" if db_status == "ok" else "degraded"
-    return {"status": overall, "service": settings.service_name, "database": db_status, "kafka": kafka_status}
+    return {
+        "status": overall,
+        "service": settings.service_name,
+        "database": db_status,
+        "kafka": kafka_status,
+    }

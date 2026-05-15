@@ -1,10 +1,29 @@
 # CLAUDE.md — `inventory-services`
 
-Microservicio de inventario TravelHub. Módulo inicial: **Tarifas (rates)** — CRUD con validación de no-solapamiento, auditoría append-only y RBAC/MFA.
+Microservicio de inventario TravelHub. Módulo inicial: **Tarifas** (tabla canonical `tarifa`) — CRUD con validación de no-solapamiento, auditoría append-only y RBAC/MFA.
 
 ## Stack
 
 Python 3.11 · FastAPI 0.115 · SQLAlchemy 2.0 async + asyncpg · Pydantic v2 · PostgreSQL 16
+
+## Schema canonical (desde 2026-05-14)
+
+| Tabla | Cols clave | Notas |
+|---|---|---|
+| `tarifa` | `id` varchar, `habitacionId` varchar FK → habitacion, `precioBase` double, `moneda` varchar, `fechaInicio`/`fechaFin` timestamptz, `descuento` double [0,1] | **Sin `estado`** — DELETE es hard delete |
+| `tarifa_history` | `tarifa_id` varchar (lógico FK), `action` enum, JSONB old/new | Audit append-only — sin FK formal para que DELETE no borre histórico |
+| `habitacion`, `hotel` | (read-only desde inventory) | Owner: search-service. Cols mapeadas mínimas en `app/models/habitacion.py` + `app/models/hotel.py` |
+
+**Reglas de dominio cerradas** (modelo de promos desde 2026-05-14):
+1. **Overlap permitido**: múltiples tarifas pueden solapar para misma `habitacionId`. Convención: `descuento=0` es base, `descuento>0` es promo. EXCLUDE constraint **eliminado** (alembic 0004).
+2. **Resolución `/vigente`**: regla "rango más estrecho gana, fechaInicio más reciente como desempate":
+   - Base anual + Promo 3 días → promo gana en sus 3 días
+   - Base anual + nueva base trimestral (cambio prospectivo) → trimestral gana en su rango
+   - "Subir base" prospectivo: crear nueva fila base con rango más corto desde la fecha deseada
+3. **`/base`** (admin): devuelve la base (descuento=0) vigente, ignora promos. Usado por el front para mostrar/editar la base actual.
+4. `descuento` en [0, 1] (no porcentual). `precio_final = precioBase * (1 - descuento)`.
+5. Una habitacion = una moneda → `tarifa.moneda` se hereda de `hotel.currency` en `create()`, no se acepta en `update()`.
+6. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners + contextvars.
 
 ## Comandos
 
@@ -25,8 +44,8 @@ bash deploy/deploy-cloudrun.sh dev    # o prod
 
 | Ambiente | Project | Estado |
 |---|---|---|
-| **DEV** | `gen-lang-client-0930444414` | ⚠ Pendiente primer deploy (gateway = PLACEHOLDER) |
-| **PROD** | `travelhub-prod-492116` | ⚠ Pendiente primer deploy |
+| **DEV** | `gen-lang-client-0930444414` | ✅ Desplegado 2026-05-13 (PR #1) + refactor canonical 2026-05-14 (`feature/canonical-refactor`). Alembic 0003 ya ejecutado: drop `rates`+`rate_history` legacy, crea `tarifa_history`. Tabla `tarifa` viene del schema canonical pre-existente. |
+| **PROD** | `travelhub-prod-492116` | ⚠ Pendiente primer deploy del canonical refactor (PR a main + canary approval). |
 
 ### Prerrequisitos antes del primer deploy
 
@@ -53,14 +72,22 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 
 | Método | Path | Roles | Descripción |
 |---|---|---|---|
-| GET | `/health` | público | Estado del servicio |
-| POST | `/api/v1/inventory/rooms/{room_id}/rates` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido) |
-| GET | `/api/v1/inventory/rooms/{room_id}/rates` | `hotel_admin`, `platform_admin` | Listar tarifas de habitación |
-| GET | `/api/v1/inventory/hotels/{hotel_id}/rates` | `hotel_admin`, `platform_admin` | Listar tarifas de hotel |
-| GET | `/api/v1/inventory/rates/{rate_id}` | `hotel_admin`, `platform_admin` | Detalle tarifa |
-| PATCH | `/api/v1/inventory/rates/{rate_id}` | `hotel_admin`, `platform_admin` | Actualizar (MFA requerido) |
-| DELETE | `/api/v1/inventory/rates/{rate_id}` | `hotel_admin`, `platform_admin` | Soft delete → inactive (MFA requerido) |
-| GET | `/api/v1/inventory/rates/effective?room_id&date` | `hotel_admin`, `platform_admin` | Tarifa vigente con precio final |
+| GET | `/health` | público | Estado del servicio + DB + Kafka |
+| POST | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido). Body: `{habitacionId, precioBase, moneda?, fechaInicio, fechaFin, descuento}`. Moneda se ignora — siempre hereda de `hotel.currency`. Acepta múltiples filas solapadas (base + promos). |
+| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas de la habitación (base + promos). Front filtra por `descuento==0` / `>0` si quiere. |
+| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas/base?fecha=ISO` | `hotel_admin`, `platform_admin` | Tarifa **base** (descuento=0) vigente. Ignora promos. Para el front del admin. Si hay multi-base, devuelve la más estrecha. 404 si no hay base vigente. |
+| GET | `/api/v1/inventory/hoteles/{hotel_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas del hotel (todas las habitaciones) |
+| GET | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Detalle tarifa |
+| PATCH | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Actualizar (MFA requerido) |
+| DELETE | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | **Hard delete** (MFA requerido). Audit row queda en `tarifa_history`. |
+| GET | `/api/v1/inventory/tarifas/vigente?habitacion_id&fecha` | `hotel_admin`, `platform_admin` | Tarifa **vigente** (considerando promos) para `fecha` (datetime ISO) con `precioFinal` calculado. Regla: rango más estrecho gana. |
+
+**Cambios respecto a la API legacy `/rates`** (2026-05-14):
+
+- `/rooms` → `/habitaciones`, `/hotels` → `/hoteles`, `/rates` → `/tarifas`, `/effective` → `/vigente`
+- Body fields: `room_id`/`habitacionId` (varchar), `base_price` → `precioBase` (float), `valid_from`/`valid_to` → `fechaInicio`/`fechaFin` (datetime ISO con timezone), `discount` → `descuento`, `currency` → `moneda`
+- Response no incluye `status`/`created_at`/`updated_at` — la canonical no los tiene
+- DELETE devuelve 204 (era soft delete con status=inactive)
 
 ## CI/CD
 

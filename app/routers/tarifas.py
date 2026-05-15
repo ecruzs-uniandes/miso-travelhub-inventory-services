@@ -44,6 +44,23 @@ async def list_tarifas_for_habitacion(
     return [TarifaRead.model_validate(t) for t in tarifas]
 
 
+@router.get("/habitaciones/{habitacion_id}/tarifas/base")
+async def get_tarifa_base(
+    habitacion_id: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[dict, Depends(auth_chain)],
+    en_fecha: Annotated[datetime | None, Query(alias="fecha")] = None,
+) -> TarifaRead:
+    """Tarifa BASE (descuento=0) vigente para `fecha` (default now).
+
+    Usado por el front del admin para mostrar la tarifa base actual y editarla.
+    Si el admin necesita ver todas las bases (caso multi-base), usa el endpoint
+    de listado y filtra por descuento=0.
+    """
+    tarifa = await _svc(db).get_base(habitacion_id, en_fecha)
+    return TarifaRead.model_validate(tarifa)
+
+
 @router.get("/hoteles/{hotel_id}/tarifas")
 async def list_tarifas_for_hotel(
     hotel_id: str,

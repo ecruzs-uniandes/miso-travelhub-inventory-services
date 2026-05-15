@@ -24,7 +24,8 @@ class RateHistory(Base):
     )
     rate_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     action: Mapped[AuditAction] = mapped_column(
-        Enum(AuditAction, name="audit_action"), nullable=False
+        Enum(AuditAction, name="audit_action", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
     )
     changed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), nullable=True

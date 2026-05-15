@@ -57,6 +57,53 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 4. `descuento ∈ [0, 1]`, `precioBase > 0`, `fechaInicio ≤ fechaFin` (CheckConstraints).
 5. `tarifa.moneda` se hereda de `hotel.currency` (`Hotel` ↔ `Habitacion` ↔ `Tarifa`).
 6. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners.
+7. **MFA requerido** en write operations (POST/PATCH/DELETE) para `hotel_admin`. El JWT debe traer `mfa_verified=true`.
+
+### Operativa del hotel_admin (flujo de UI)
+
+```
+1. Abrir editor de tarifas para "Suite 002":
+   GET /habitaciones/b1.../tarifas/base
+   → muestra precioBase=150, fechaInicio=2026-01-01, fechaFin=2026-12-31 (base anual)
+
+2. Cambiar precio base SOLO desde abril (cambio prospectivo):
+   POST /habitaciones/b1.../tarifas
+   { "habitacionId": "b1...", "precioBase": 165, "descuento": 0,
+     "fechaInicio": "2026-04-01T00:00:00Z", "fechaFin": "2026-12-31T23:59:59Z" }
+   → Nueva base trimestral. La anual sigue, pero pierde por rango más estrecho.
+
+3. Agregar promo Black Friday 30% (3 días):
+   POST /habitaciones/b1.../tarifas
+   { "habitacionId": "b1...", "precioBase": 165, "descuento": 0.30,
+     "fechaInicio": "2026-11-28T00:00:00Z", "fechaFin": "2026-11-30T23:59:59Z" }
+   → Promo independiente; base anual sigue intacta.
+
+4. Cancelar la promo:
+   DELETE /tarifas/{promo_id}    → 204, audit row en tarifa_history.
+
+5. Ver listado completo para auditoría:
+   GET /habitaciones/b1.../tarifas
+   → array con base anual + base trimestral + cualquier promo viva. El front
+     filtra por descuento==0 (bases) y descuento>0 (promos).
+```
+
+### Cálculo del precio final
+
+`precioFinal = round(precioBase * (1 - descuento), 2)`
+
+Lo calcula el backend en `Tarifa.calcular_precio_final()` y lo devuelve en `/vigente`. El front no calcula nada — solo renderiza. Si quiere mostrar "tachado/promo" usa los campos `precioBase` y `descuento` que también vienen en la respuesta.
+
+### Eventos Kafka publicados
+
+Topic `inventory-rate-events` (3 particiones, key = `hotel_id`):
+
+| event_type | Trigger | Payload |
+|---|---|---|
+| `tarifa_created` | POST exitoso | `{event_id, hotel_id, habitacion_id, tarifa_id, precio_base, moneda, descuento, precio_final, fecha_inicio, fecha_fin, timestamp}` |
+| `tarifa_updated` | PATCH exitoso | igual |
+| `tarifa_deleted` | DELETE exitoso (antes del hard delete) | igual |
+
+Configurable via `KAFKA_ENABLED=false` (deshabilita producer; tests + local sin kafka).
 
 ## Tests
 
@@ -69,7 +116,15 @@ KAFKA_ENABLED=false \
 pytest
 ```
 
-16 tests pasando. Cobertura mínima: 70% (enforced en CI).
+22 tests pasando (~78% coverage). Mínimo enforced en CI: 70%.
+
+Suites:
+- `test_health.py` — health endpoint
+- `test_tarifa_crud.py` — POST/GET/PATCH/DELETE happy path + 404
+- `test_tarifa_overlap.py` — modelo de promos: promo over base, subir base prospectivo, dos promos solapadas
+- `test_tarifa_base.py` — endpoint `/base`: con/sin fecha, ignora promos, multi-base, 404
+- `test_tarifa_rbac.py` — RBAC: traveler 403, hotel_admin cross-hotel 403, MFA requerido para write
+- `test_tarifa_audit.py` — audit row en `tarifa_history` para create/update/delete
 
 ## Despliegue Cloud Run
 
@@ -79,3 +134,9 @@ Manual:
 ```bash
 bash deploy/deploy-cloudrun.sh dev    # o prod
 ```
+
+## Más docs
+
+- [`CLAUDE.md`](./CLAUDE.md) — contexto profundo: network setup GCP, secrets, deploy gotchas
+- [`../PMS_DATA_MODEL.md`](../PMS_DATA_MODEL.md) — sección "Modelo de tarifas + promociones" con escenarios, SQL de resolución, mapping legacy → canonical
+- [`../CONTEXT_ROOT.md`](../CONTEXT_ROOT.md) — mapa global del monorepo TravelHub

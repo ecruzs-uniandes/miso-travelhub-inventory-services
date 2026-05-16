@@ -44,19 +44,15 @@ async def list_tarifas_for_habitacion(
     return [TarifaRead.model_validate(t) for t in tarifas]
 
 
+# Endpoint PUBLICO (sin auth_chain): el viajero anonimo puede consultar precios
+# antes de registrarse. Gateway tampoco exige JWT en esta ruta.
 @router.get("/habitaciones/{habitacion_id}/tarifas/base")
 async def get_tarifa_base(
     habitacion_id: str,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(auth_chain)],
     en_fecha: Annotated[datetime | None, Query(alias="fecha")] = None,
 ) -> TarifaRead:
-    """Tarifa BASE (descuento=0) vigente para `fecha` (default now).
-
-    Usado por el front del admin para mostrar la tarifa base actual y editarla.
-    Si el admin necesita ver todas las bases (caso multi-base), usa el endpoint
-    de listado y filtra por descuento=0.
-    """
+    """Tarifa BASE (descuento=0) vigente para `fecha` (default now). Publico."""
     tarifa = await _svc(db).get_base(habitacion_id, en_fecha)
     return TarifaRead.model_validate(tarifa)
 
@@ -72,10 +68,11 @@ async def list_tarifas_for_hotel(
 
 
 # NOTE: /tarifas/vigente must be declared before /tarifas/{tarifa_id}
+# Endpoint PUBLICO (sin auth_chain): el viajero anonimo puede consultar precios
+# antes de registrarse. Gateway tampoco exige JWT en esta ruta.
 @router.get("/tarifas/vigente")
 async def get_tarifa_vigente(
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[dict, Depends(auth_chain)],
     habitacion_id: Annotated[str, Query(...)],
     en_fecha: Annotated[datetime, Query(..., alias="fecha")],
 ) -> TarifaVigente:

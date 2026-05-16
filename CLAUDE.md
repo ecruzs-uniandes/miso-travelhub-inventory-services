@@ -76,12 +76,12 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 | GET | `/health` | público | Estado del servicio + DB + Kafka |
 | POST | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido). Body: `{habitacionId, precioBase, moneda?, fechaInicio, fechaFin, descuento}`. Moneda se ignora — siempre hereda de `hotel.currency`. Acepta múltiples filas solapadas (base + promos). |
 | GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas de la habitación (base + promos). Front filtra por `descuento==0` / `>0` si quiere. |
-| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas/base?fecha=ISO` | `hotel_admin`, `platform_admin` | Tarifa **base** (descuento=0) vigente. Ignora promos. Para el front del admin. Si hay multi-base, devuelve la más estrecha. 404 si no hay base vigente. |
+| GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas/base?fecha=ISO` | **público** | Tarifa **base** (descuento=0) vigente. Ignora promos. Lo usa el front del admin y también el viajero anónimo en página de detalle. Si hay multi-base, devuelve la más estrecha. 404 si no hay base vigente. |
 | GET | `/api/v1/inventory/hoteles/{hotel_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas del hotel (todas las habitaciones) |
 | GET | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Detalle tarifa |
 | PATCH | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Actualizar (MFA requerido) |
 | DELETE | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | **Hard delete** (MFA requerido). Audit row queda en `tarifa_history`. |
-| GET | `/api/v1/inventory/tarifas/vigente?habitacion_id&fecha` | `hotel_admin`, `platform_admin` | Tarifa **vigente** (considerando promos) para `fecha` (datetime ISO) con `precioFinal` calculado. Regla: rango más estrecho gana. |
+| GET | `/api/v1/inventory/tarifas/vigente?habitacion_id&fecha` | **público** | Tarifa **vigente** (considerando promos) para `fecha` (datetime ISO) con `precioFinal` calculado. Regla: rango más estrecho gana. Lo consume el viajero anónimo antes de registrarse + el front del admin. |
 
 **Cambios respecto a la API legacy `/rates`** (2026-05-14):
 

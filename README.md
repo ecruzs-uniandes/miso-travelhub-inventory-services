@@ -17,18 +17,18 @@ Schema canonical creado por `travelhub-local/scripts/init-db.sql` con seed (1 ho
 
 ## Endpoints (módulo tarifa)
 
-Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya verificó).
+Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya verificó) **excepto** los 2 endpoints públicos marcados abajo.
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| POST   | `/habitaciones/{habitacion_id}/tarifas` | Crear tarifa. Moneda heredada de `hotel.currency`. Acepta solapamientos (base + promos). |
-| GET    | `/habitaciones/{habitacion_id}/tarifas` | Listar todas (base + promos) de una habitación |
-| GET    | `/habitaciones/{habitacion_id}/tarifas/base?fecha=<ISO>` | **Base vigente** (descuento=0). Ignora promos. Para el front del admin |
-| GET    | `/hoteles/{hotel_id}/tarifas` | Listar todas las tarifas de un hotel |
-| GET    | `/tarifas/vigente?habitacion_id=<id>&fecha=<ISO>` | Tarifa **vigente** (incluye promos) con `precioFinal` calculado |
-| GET    | `/tarifas/{tarifa_id}` | Detalle |
-| PATCH  | `/tarifas/{tarifa_id}` | Actualizar campos parciales |
-| DELETE | `/tarifas/{tarifa_id}` | **Hard delete** — audit row queda en `tarifa_history` |
+| Método | Ruta | Auth | Descripción |
+|---|---|---|---|
+| POST   | `/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`/`platform_admin` + MFA | Crear tarifa. Moneda heredada de `hotel.currency`. Acepta solapamientos (base + promos). |
+| GET    | `/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`/`platform_admin` | Listar todas (base + promos) de una habitación |
+| GET    | `/habitaciones/{habitacion_id}/tarifas/base?fecha=<ISO>` | **público** | **Base vigente** (descuento=0). Ignora promos. Lo consume el front del admin y también el viajero anónimo en página de detalle. |
+| GET    | `/hoteles/{hotel_id}/tarifas` | `hotel_admin`/`platform_admin` | Listar todas las tarifas de un hotel |
+| GET    | `/tarifas/vigente?habitacion_id=<id>&fecha=<ISO>` | **público** | Tarifa **vigente** (incluye promos) con `precioFinal` calculado. Lo consume el viajero anónimo antes de registrarse. |
+| GET    | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` | Detalle |
+| PATCH  | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` + MFA | Actualizar campos parciales |
+| DELETE | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` + MFA | **Hard delete** — audit row queda en `tarifa_history` |
 
 ### Schema body (POST/PATCH)
 

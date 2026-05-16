@@ -190,12 +190,11 @@ class TarifaService:
         """Tarifa BASE (descuento=0) vigente para `en_fecha` (default now).
 
         Misma regla de resolución que `/vigente` pero filtrando solo bases.
-        Usado por el front-end del admin para editar la tarifa base actual.
+        Lo consume el front del admin y también el viajero anónimo (público) —
+        por eso no hay check de ownership.
         """
         if en_fecha is None:
             en_fecha = datetime.now(UTC)
-        _, hotel = await self._get_habitacion_with_hotel(habitacion_id)
-        self._check_ownership(hotel.id)
         stmt = (
             select(Tarifa)
             .where(

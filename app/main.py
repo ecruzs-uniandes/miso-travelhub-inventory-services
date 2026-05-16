@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.audit.listeners import register_tarifa_audit_listeners
 from app.config import settings
-from app.routers import health, tarifas
+from app.routers import habitaciones, health, tarifas
 from app.services import kafka_producer as kp
 
 logging.basicConfig(level=settings.log_level)
@@ -34,6 +34,7 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(tarifas.router)
+app.include_router(habitaciones.router)
 
 
 @app.get("/")

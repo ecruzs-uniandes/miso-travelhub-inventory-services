@@ -25,6 +25,7 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 | GET    | `/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`/`platform_admin` | Listar todas (base + promos) de una habitación |
 | GET    | `/habitaciones/{habitacion_id}/tarifas/base?fecha=<ISO>` | **público** | **Base vigente** (descuento=0). Ignora promos. Lo consume el front del admin y también el viajero anónimo en página de detalle. |
 | GET    | `/hoteles/{hotel_id}/tarifas` | `hotel_admin`/`platform_admin` | Listar todas las tarifas de un hotel |
+| GET    | `/hoteles/{hotel_id}/habitaciones` | `hotel_admin`/`platform_admin` | Listar habitaciones de un hotel (vista admin). Read-only — inventory NO es owner, solo expone el listado para que el front pinte "mis habitaciones" y luego entre al CRUD de tarifas. |
 | GET    | `/tarifas/vigente?habitacion_id=<id>&fecha=<ISO>` | **público** | Tarifa **vigente** (incluye promos) con `precioFinal` calculado. Lo consume el viajero anónimo antes de registrarse. |
 | GET    | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` | Detalle |
 | PATCH  | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` + MFA | Actualizar campos parciales |

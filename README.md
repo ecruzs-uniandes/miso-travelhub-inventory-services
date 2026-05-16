@@ -1,6 +1,6 @@
 # inventory-services
 
-Microservicio de inventario de TravelHub. Módulo: **Tarifas** (tabla canonical `tarifa`).
+Microservicio de inventario de TravelHub. Módulo principal: **Tarifas** (tabla canonical `tarifa`). Expone también un listado read-only de **habitaciones por hotel** (`/hoteles/{id}/habitaciones`) como entry point del flujo admin — el owner real de `habitacion` sigue siendo `search-service`.
 
 ## Quick start (local)
 
@@ -63,6 +63,10 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 ### Operativa del hotel_admin (flujo de UI)
 
 ```
+0. Listar habitaciones de mi hotel (entry point del admin):
+   GET /hoteles/{mi_hotel_id}/habitaciones
+   → array de habitaciones; el front pinta la grid y el admin selecciona una
+
 1. Abrir editor de tarifas para "Suite 002":
    GET /habitaciones/b1.../tarifas/base
    → muestra precioBase=150, fechaInicio=2026-01-01, fechaFin=2026-12-31 (base anual)
@@ -117,7 +121,7 @@ KAFKA_ENABLED=false \
 pytest
 ```
 
-22 tests pasando (~78% coverage). Mínimo enforced en CI: 70%.
+29 tests pasando. Mínimo enforced en CI: 70% cobertura.
 
 Suites:
 - `test_health.py` — health endpoint
@@ -126,6 +130,7 @@ Suites:
 - `test_tarifa_base.py` — endpoint `/base`: con/sin fecha, ignora promos, multi-base, 404
 - `test_tarifa_rbac.py` — RBAC: traveler 403, hotel_admin cross-hotel 403, MFA requerido para write
 - `test_tarifa_audit.py` — audit row en `tarifa_history` para create/update/delete
+- `test_habitacion_list.py` — listado de habitaciones por hotel: RBAC, hotel sin habitaciones, orden por tipo
 
 ## Despliegue Cloud Run
 

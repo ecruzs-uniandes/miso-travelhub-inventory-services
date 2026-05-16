@@ -3,7 +3,6 @@ from fastapi import Request
 
 from app.auth.jwt_decoder import decode_jwt, extract_token
 from app.middleware.filters.ip_validation import IPValidationFilter
-from app.middleware.filters.mfa import MFAFilter
 from app.middleware.filters.rate_limit import RateLimitFilter
 from app.middleware.filters.rbac import RBACFilter
 
@@ -12,8 +11,7 @@ def _build_chain() -> RateLimitFilter:
     rate_limit = RateLimitFilter()
     ip_validation = IPValidationFilter()
     rbac = RBACFilter()
-    mfa = MFAFilter()
-    rate_limit.set_next(ip_validation).set_next(rbac).set_next(mfa)
+    rate_limit.set_next(ip_validation).set_next(rbac)
     return rate_limit
 
 

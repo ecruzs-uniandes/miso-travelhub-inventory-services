@@ -1,6 +1,6 @@
 # CLAUDE.md — `inventory-services`
 
-Microservicio de inventario TravelHub. Módulo inicial: **Tarifas** (tabla canonical `tarifa`) — CRUD con validación de no-solapamiento, auditoría append-only y RBAC/MFA.
+Microservicio de inventario TravelHub. Módulo inicial: **Tarifas** (tabla canonical `tarifa`) — CRUD con validación de no-solapamiento, auditoría append-only y RBAC (MFA solo en login — vive en `user-services`).
 
 ## Stack
 
@@ -74,14 +74,14 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 | Método | Path | Roles | Descripción |
 |---|---|---|---|
 | GET | `/health` | público | Estado del servicio + DB + Kafka |
-| POST | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Crear tarifa (MFA requerido). Body: `{habitacionId, precioBase, moneda?, fechaInicio, fechaFin, descuento}`. Moneda se ignora — siempre hereda de `hotel.currency`. Acepta múltiples filas solapadas (base + promos). |
+| POST | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Crear tarifa. Body: `{habitacionId, precioBase, moneda?, fechaInicio, fechaFin, descuento}`. Moneda se ignora — siempre hereda de `hotel.currency`. Acepta múltiples filas solapadas (base + promos). |
 | GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas de la habitación (base + promos). Front filtra por `descuento==0` / `>0` si quiere. |
 | GET | `/api/v1/inventory/habitaciones/{habitacion_id}/tarifas/base?fecha=ISO` | **público** | Tarifa **base** (descuento=0) vigente. Ignora promos. Lo usa el front del admin y también el viajero anónimo en página de detalle. Si hay multi-base, devuelve la más estrecha. 404 si no hay base vigente. |
 | GET | `/api/v1/inventory/hoteles/{hotel_id}/tarifas` | `hotel_admin`, `platform_admin` | Listar todas las tarifas del hotel (todas las habitaciones) |
 | GET | `/api/v1/inventory/hoteles/{hotel_id}/habitaciones` | `hotel_admin`, `platform_admin` | Listar habitaciones de un hotel (vista admin: "mis habitaciones" → seleccionar → entrar al CRUD de tarifas). Read-only — inventory NO es owner, solo expone el listado. Devuelve [] si el hotel no tiene habitaciones. |
 | GET | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Detalle tarifa |
-| PATCH | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Actualizar (MFA requerido) |
-| DELETE | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | **Hard delete** (MFA requerido). Audit row queda en `tarifa_history`. |
+| PATCH | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | Actualizar |
+| DELETE | `/api/v1/inventory/tarifas/{tarifa_id}` | `hotel_admin`, `platform_admin` | **Hard delete**. Audit row queda en `tarifa_history`. |
 | GET | `/api/v1/inventory/tarifas/vigente?habitacion_id&fecha` | **público** | Tarifa **vigente** (considerando promos) para `fecha` (datetime ISO) con `precioFinal` calculado. Regla: rango más estrecho gana. Lo consume el viajero anónimo antes de registrarse + el front del admin. |
 
 **Cambios respecto a la API legacy `/rates`** (2026-05-14):

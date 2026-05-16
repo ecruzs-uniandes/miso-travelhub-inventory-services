@@ -6,7 +6,8 @@ The API Gateway has already validated:
 - Audience claim
 - Expiration
 
-The backend only needs to read claims for RBAC, MFA, and audit purposes.
+The backend only needs to read claims for RBAC and audit purposes (MFA enforcement
+lives in user-services at login time, not per-request here).
 """
 from typing import Any
 

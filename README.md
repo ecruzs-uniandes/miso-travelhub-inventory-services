@@ -21,15 +21,15 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 
 | Método | Ruta | Auth | Descripción |
 |---|---|---|---|
-| POST   | `/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`/`platform_admin` + MFA | Crear tarifa. Moneda heredada de `hotel.currency`. Acepta solapamientos (base + promos). |
+| POST   | `/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`/`platform_admin` | Crear tarifa. Moneda heredada de `hotel.currency`. Acepta solapamientos (base + promos). |
 | GET    | `/habitaciones/{habitacion_id}/tarifas` | `hotel_admin`/`platform_admin` | Listar todas (base + promos) de una habitación |
 | GET    | `/habitaciones/{habitacion_id}/tarifas/base?fecha=<ISO>` | **público** | **Base vigente** (descuento=0). Ignora promos. Lo consume el front del admin y también el viajero anónimo en página de detalle. |
 | GET    | `/hoteles/{hotel_id}/tarifas` | `hotel_admin`/`platform_admin` | Listar todas las tarifas de un hotel |
 | GET    | `/hoteles/{hotel_id}/habitaciones` | `hotel_admin`/`platform_admin` | Listar habitaciones de un hotel (vista admin). Read-only — inventory NO es owner, solo expone el listado para que el front pinte "mis habitaciones" y luego entre al CRUD de tarifas. |
 | GET    | `/tarifas/vigente?habitacion_id=<id>&fecha=<ISO>` | **público** | Tarifa **vigente** (incluye promos) con `precioFinal` calculado. Lo consume el viajero anónimo antes de registrarse. |
 | GET    | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` | Detalle |
-| PATCH  | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` + MFA | Actualizar campos parciales |
-| DELETE | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` + MFA | **Hard delete** — audit row queda en `tarifa_history` |
+| PATCH  | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` | Actualizar campos parciales |
+| DELETE | `/tarifas/{tarifa_id}` | `hotel_admin`/`platform_admin` | **Hard delete** — audit row queda en `tarifa_history` |
 
 ### Schema body (POST/PATCH)
 
@@ -58,7 +58,7 @@ Prefijo: `/api/v1/inventory`. Auth: JWT Bearer (decode no-verify, gateway ya ver
 4. `descuento ∈ [0, 1]`, `precioBase > 0`, `fechaInicio ≤ fechaFin` (CheckConstraints).
 5. `tarifa.moneda` se hereda de `hotel.currency` (`Hotel` ↔ `Habitacion` ↔ `Tarifa`).
 6. Auditoría append-only en `tarifa_history` via SQLAlchemy event listeners.
-7. **MFA requerido** en write operations (POST/PATCH/DELETE) para `hotel_admin`. El JWT debe traer `mfa_verified=true`.
+7. **MFA solo en login** (responsabilidad de `user-services`). Inventory no exige `mfa_verified` para writes — el JWT válido + RBAC es suficiente.
 
 ### Operativa del hotel_admin (flujo de UI)
 
@@ -128,7 +128,7 @@ Suites:
 - `test_tarifa_crud.py` — POST/GET/PATCH/DELETE happy path + 404
 - `test_tarifa_overlap.py` — modelo de promos: promo over base, subir base prospectivo, dos promos solapadas
 - `test_tarifa_base.py` — endpoint `/base`: con/sin fecha, ignora promos, multi-base, 404
-- `test_tarifa_rbac.py` — RBAC: traveler 403, hotel_admin cross-hotel 403, MFA requerido para write
+- `test_tarifa_rbac.py` — RBAC: traveler 403, hotel_admin cross-hotel 403, platform_admin cross-hotel 200, JWT ausente 401
 - `test_tarifa_audit.py` — audit row en `tarifa_history` para create/update/delete
 - `test_habitacion_list.py` — listado de habitaciones por hotel: RBAC, hotel sin habitaciones, orden por tipo
 
